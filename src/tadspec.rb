@@ -1,52 +1,70 @@
-class RefinamientoComparable
-  def initialize(bloque)
-    @bloque = bloque
+module TADsPEC
+  class ::Object
+    def deberia(asercion)
+      asercion.call(self)
+    end
   end
-  def comparate_con(un_valor)
-    @bloque.call(un_valor)
+
+  class ::Module
+    def mockear(nombre_metodo, &implementacion)
+      alias_method("#{nombre_metodo}_backup", nombre_metodo)
+      define_method(nombre_metodo, &implementacion)
+      TADTest.agregar_metodo_mockeado(self, nombre_metodo)
+    end
   end
 end
-module TestSuite
 
-  class ::Object
-    def deberia(refinamiento)
-      refinamiento.call(self)
-    end
-    def mockear(mensaje, &bloque)
-      self.define_singleton_method(mensaje, &bloque)
-    end
+class TADTest
+  def self.metodos_mockeados
+    @metodos_mockeados ||= []
   end
 
-  def ser(algo)
-    proc {|checkeado|
-      if algo.is_a? RefinamientoComparable
-        algo.comparate_con checkeado
-      else
-        algo == checkeado
+  def self.agregar_metodo_mockeado(clase, nombre_metodo)
+    @metodos_mockeados = self.metodos_mockeados << [clase, nombre_metodo]
+  end
+
+  def self.limpiar_metodos
+    self.metodos_mockeados.each do |clase, nombre_metodo|
+      clase.send(:alias_method, nombre_metodo, "#{nombre_metodo}_backup")
+      clase.send(:remove_method, "#{nombre_metodo}_backup")
+    end
+
+    @metodos_mockeados = []
+  end
+
+  def self.evalua(&bloque)
+    resultado = new.instance_eval(&bloque)
+    TADTest.limpiar_metodos
+    resultado
+  end
+
+  def method_missing(nombre_metodo, *args, &bloque)
+    if nombre_metodo.to_s.start_with?('ser_')
+      nombre_metodo_booleano = nombre_metodo.to_s.split("_").last + "?"
+      proc { |valor_actual| valor_actual.send(nombre_metodo_booleano) }
+    elsif nombre_metodo.to_s.start_with?('tener_')
+      nombre_atributo = "@" + nombre_metodo.to_s.split("_").last
+      proc do |valor_actual|
+        valor_actual.instance_variable_get(nombre_atributo).deberia ser(args.first)
       end
-    }
+    else
+      super(nombre_metodo, *args, &bloque)
+    end
   end
-  def mayor_a(algo)
-    RefinamientoComparable
-        .new(proc {|checkeado| checkeado >= algo})
-  end
-  def menor_a(algo)
 
+  def respond_to_missing?(nombre_metodo)
+    nombre_metodo.start_with?('ser_') || nombre_metodo.start_with?('tener_') || super(nombre_metodo)
   end
-  def entender(mensaje)
-    proc {|checkeado| checkeado.respond_to? mensaje}
+
+  def ser(esperado)
+    if esperado.is_a? Proc
+      esperado
+    else
+      proc { |valor_actual| valor_actual == esperado }
+    end
   end
-  def polimorfico_con(modulo)
-    RefinamientoComparable
-      .new(proc {|checkeado|
-        modulo.instance_methods(false).all? {|mensaje|
-            checkeado.respond_to? mensaje
-          }
-        })
-  end
-  def no(refinamiento)
-    proc {|checkeado|
-      ! refinamiento.call(checkeado)
-    }
+
+  def mayor_a(valor)
+    proc { |valor_actual| valor_actual > valor}
   end
 end
