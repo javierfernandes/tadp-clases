@@ -2,7 +2,7 @@ Clase 6 TADP 2C2017
 
 ## Assertions
 
-#### ser [matcher]
+#### [obj].deberia ser [matcher]
 ```ruby
 leandro.edad.deberia ser mayor_a 20
 ```
@@ -47,6 +47,77 @@ TADsPec.testear MiSuite
 ```
 
 ## Mocking & Spying
+
+#### Mock
+
+```ruby
+class PersonaHome
+  def todas_las_personas
+    # Este método consume un servicio web que consulta una base de datos
+  end
+
+  def personas_viejas
+    self.todas_las_personas.select{|p| p.viejo?}
+  end
+end
+
+it 'testear_que_personas_viejas_trae_solo_a_los_viejos' do
+  nico = Persona.new(30)
+  axel = Persona.new(30)
+  lean = Persona.new(22)
+
+  # Mockeo el mensaje para no consumir el servicio y simplificar el test
+  PersonaHome.mockear(:todas_las_personas) do
+    [nico, axel, lean]
+  end
+
+  expect(PersonaHome.personas_viejas).to eq [nico, axel]
+end
+```
+
+#### Spy
+```ruby
+class Persona
+  attr_accessor :edad
+  
+  def initialize(edad)
+    @edad = edad
+  end
+  
+  def viejo?
+    self.edad > 29
+  end
+end
+
+class PersonaTest
+
+  def testear_que_se_use_la_edad
+    lean = Persona.new(22)
+    pato = Persona.new(23)
+    pato = espiar(pato)
+
+    pato.viejo?
+
+    pato.deberia haber_recibido(:edad)
+    # pasa: edad se llama durante la ejecución de viejo?
+
+    pato.deberia haber_recibido(:edad).veces(1)
+    # pasa: edad se recibió exactamente 1 vez.
+    pato.deberia haber_recibido(:edad).veces(5)
+    # falla: edad sólo se recibió una vez.
+
+    pato.deberia haber_recibido(:viejo?).con_argumentos(19, "hola")
+    # falla, recibió el mensaje, pero sin esos argumentos.
+
+    pato.deberia haber_recibido(:viejo?).con_argumentos()
+    # pasa, recibió el mensaje sin argumentos.
+
+    lean.viejo?
+    lean.deberia haber_recibido(:edad)
+    # falla: lean no fue espiado!
+  end
+end
+```
 
 ## Ejercicio Integrador
 El siguiente ejercicio fue el TP de metaprogramación del 2do cuatrimestre de 2016. Incluye también lo que luego fueron TPs individuales.
