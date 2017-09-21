@@ -4,7 +4,7 @@ Clase 6 TADP 2C2017
 
 #### [obj].deberia ser [matcher]
 ```ruby
-leandro.edad.deberia ser mayor_a 20
+(2 + 2).deberia ser mayor_a 3
 ```
 
 #### ser_[condicion]
@@ -18,11 +18,9 @@ end
 nico.deberia ser_viejo    # pasa: Nico tiene edad 30.
 ```
 
-#### tener_[atributo] [matcher]
+#### tener_[atributo] [matcher] [valor]
 ```ruby
-objeto.deberia tener_[nombre del atributo] valor_esperado
-
-leandro.deberia tener_edad mayor_a 22 # pasa
+leandro.deberia(tener_edad(mayor_a(22))) # pasa
 leandro.deberia tener_altura mayor_a 123 # falla: no hay atributo altura
 ```
 

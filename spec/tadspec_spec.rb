@@ -1,96 +1,127 @@
 require 'rspec'
 require_relative '../src/tadspec'
 
-describe 'TP' do
-
-  before do
-    include TADsPEC
+class Persona
+  def initialize(edad)
+    @edad = edad
   end
 
-  context 'aserciones' do
+  def viejo?
+    @edad > 29
+  end
 
-    it 'deberia assertear que 2 + 2 es igual a 4' do
-      expect(TADTest.evalua { (2 + 2).deberia ser 4 }).to be(true)
+  def envejecer(anios)
+    @edad += anios
+  end
+end
+
+describe 'TADSpec' do
+
+  before do
+    class << self
+      include Matchers
+    end
+  end
+
+  describe 'Assertions' do
+
+    it 'puede assertear que 2 + 2 es mayor que 3' do
+      (2 + 2).deberia ser mayor_a 3
     end
 
-    it 'deberia assertear que 2 + 2 es mayor que 3' do
-      expect(TADTest.evalua { (2 + 2).deberia ser mayor_a 3 }).to be(true)
+    it 'falla el assert que 2 + 2 es mayor que 10' do
+      expect { (2 + 2).deberia ser mayor_a 10 }.to raise_error TADSpecAssertionError
     end
 
-    context 'Con una clase con metodos de consulta booleana' do
-      class Persona
-        def initialize(edad)
-          @edad = edad
-        end
-        def viejo?
-          @edad > 30
-        end
+    it 'puede assertear objetos con mensajes booleanos' do
+      Persona.new(30).deberia ser_viejo
+      expect { Persona.new(28).deberia ser_viejo }.to raise_error TADSpecAssertionError
+    end
+
+    it 'puede assertear objetos con mensajes booleanos' do
+      Persona.new(30).deberia tener_edad mayor_a 28
+      expect { Persona.new(30).deberia tener_edad mayor_a 50 }.to raise_error TADSpecAssertionError
+    end
+
+  end
+
+  describe 'Suite' do
+    class SuiteOk
+      # Esto es un test
+      def testear_que_las_personas_de_30_son_viejas
+        Persona.new(30).deberia ser_viejo
       end
 
-      it 'deberia assertear que una instancia de esa clase cumple la consulta' do
-        resultado = TADTest.evalua do
-          nico = Persona.new(31)
-          nico.deberia ser_viejo
-        end
-
-        expect(resultado).to be true
-      end
-
-      it 'deberia romper si la instancia no conoce el metodo de consulta' do
-        (expect do
-          TADTest.evalua do
-            nico = Persona.new(30)
-            nico.deberia ser_pelado
-          end
-        end).to raise_error NoMethodError
+      # Esto no
+      def las_personas_de_30_son_viejas
+        Persona.new(30).deberia ser_viejo
       end
     end
 
-    context 'con objetos que tienen atributos' do
-      class Pepita
-        def initialize
-          @energia = 20
-        end
-      end
-      it 'deberia assertear que un objeto tiene un atributo con determinado valor' do
-        expect(TADTest.evalua { Pepita.new.deberia tener_energia 20 }).to be true
-      end
-
-      it 'deberia assertear que un objeto tiene un atributo que cumple una cierta asercion' do
-        expect(TADTest.evalua { Pepita.new.deberia tener_energia mayor_a 3 }).to be true
+    class SuiteError
+      def testear_que_las_personas_de_20_son_viejas
+        Persona.new(20).deberia ser_viejo
       end
     end
 
+    it 'puede evaluar una suite sin errores' do
+      TADSpec.testear SuiteOk
+    end
 
-    describe 'Mocks' do
-      class Guerrero
-        attr_reader :salud
-        def initialize
-          @salud = 100
-        end
-        def sufrir_danio
-          @salud -= 30
-        end
+    it 'puede evaluar una suite con errores' do
+      expect { TADSpec.testear SuiteError }.to raise_error TADSpecAssertionError
+    end
+  end
+
+  describe 'Mocks' do
+
+    class PersonaHome
+      def todas_las_personas
+        # Este método consume un servicio web que consulta una base de datos
       end
 
-      it 'una instancia de una clase a la que le mockeamos un mensaje responde el resultado mockeado en vez de su verdadera implementacion' do
-        resultadoDePrimerTest = TADTest.evalua do
-          Guerrero.mockear(:salud) { 42 }
-
-          atila = Guerrero.new
-
-          atila.salud.deberia ser 42
-        end
-
-        resultadoDelSegundoTest = TADTest.evalua do
-          atila = Guerrero.new
-
-          atila.salud.deberia ser 100
-        end
-
-        expect(resultadoDePrimerTest).to be true
-        expect(resultadoDelSegundoTest).to be true
+      def personas_viejas
+        self.todas_las_personas.select { |p| p.viejo? }
       end
     end
+
+    it 'testear_que_personas_viejas_trae_solo_a_los_viejos' do
+      nico = Persona.new(30)
+      axel = Persona.new(30)
+      lean = Persona.new(22)
+
+      # Mockeo el mensaje para no consumir el servicio y simplificar el test
+      home = PersonaHome.new.mockear(:todas_las_personas) do
+        [nico, axel, lean]
+      end
+
+      expect(home.personas_viejas).to eq [nico, axel]
+    end
+
+  end
+
+  describe 'Spy' do
+
+    it 'puede validar que se manda un mensaje' do
+      pato = espiar(Persona.new(23))
+      pato.viejo?
+
+      pato.deberia haber_recibido(:viejo?)
+      expect { pato.deberia haber_recibido(:zarlompa) }.to raise_error TADSpecAssertionError
+    end
+
+    it 'puede validar que se manda un mensaje con argumentos' do
+      pato = espiar(Persona.new(23))
+      pato.viejo?
+      pato.envejecer(10)
+
+      pato.deberia haber_recibido(:viejo?).con_argumentos()
+      expect { pato.deberia haber_recibido(:viejo?).con_argumentos(19, "hola") }.to raise_error TADSpecAssertionError
+
+      pato.deberia haber_recibido(:envejecer)
+      pato.deberia haber_recibido(:envejecer).con_argumentos(10)
+      expect { pato.deberia haber_recibido(:envejecer).con_argumentos(20) }.to raise_error TADSpecAssertionError
+    end
+
   end
 end
